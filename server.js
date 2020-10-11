@@ -1,3 +1,7 @@
+
+const fs = require('fs');
+const path = require('path');
+
 //route that the front end can request data from 
 const { animals } = require('./data/animals');
 
@@ -9,6 +13,11 @@ const PORT = process.env.PORT || 3001;
 
 //INSTANTIATING THE SERVER 
 const app = express();
+
+// parse incoming string or array data
+app.use(express.urlencoded({ extended: true }));
+// parse incoming JSON data
+app.use(express.json());
 
 // app.get('/api/animals', (req, res) => {
 //     res.json(animals);
@@ -59,6 +68,33 @@ function filterByQuery(query, animalsArray) {
     return result;
   }
 
+  // creates the new animal and writes it to the animals.json file
+  function createNewAnimal(body, animalsArray) {
+    const animal = body;
+    animalsArray.push(animal);
+    fs.writeFileSync(
+      path.join(__dirname, './data/animals.json'),
+      JSON.stringify({ animals: animalsArray }, null, 2)
+    );
+    return animal;
+  }
+//function to validate the information coming from the server 
+  function validateAnimal(animal) {
+    if (!animal.name || typeof animal.name !== 'string') {
+      return false;
+    }
+    if (!animal.species || typeof animal.species !== 'string') {
+      return false;
+    }
+    if (!animal.diet || typeof animal.diet !== 'string') {
+      return false;
+    }
+    if (!animal.personalityTraits || !Array.isArray(animal.personalityTraits)) {
+      return false;
+    }
+    return true;
+  }
+
 // the first is that the get() method requires two arguments. The first is a string that 
 // describes the route the client will have to fetch from. The second is a callback function 
 // that will execute every time that route is accessed with a GET request.
@@ -74,8 +110,29 @@ app.get('/api/animals', (req, res) => {
 
   app.get('/api/animals/:id', (req, res) => {
     const result = findById(req.params.id, animals);
+    if (result) {
       res.json(result);
+    } else {
+      res.send(404);
+    }
   });
+
+
+
+  app.post('/api/animals', (req, res) => {
+    // set id based on what the next index of the array will be
+    req.body.id = animals.length.toString();
+  
+    // if any data in req.body is incorrect, send 400 error back
+    if (!validateAnimal(req.body)) {
+      //response method to relay a method to the client making the request 
+      res.status(400).send('The animal is not properly formatted.');
+    } else {
+      const animal = createNewAnimal(req.body, animals);
+      res.json(animal);
+    }
+  });
+
 
 //code to have our app listening for requsts 
 app.listen(PORT, () => {
